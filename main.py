@@ -84,8 +84,8 @@ class LuciFactFinder:
 
             time.sleep(1)
 
-        for fact in self.f2c:
-            with st.expander(fact):
+
+            with st.expander(question):
                 for r in sr:
                     st.write(f"Title: {r['title']}")
                     st.write(f"\tLink: {r['link']}")
