@@ -47,49 +47,66 @@ class LuciDocumentProcessor:
 class LuciFactFinder:
     """
     Handles fact-finding of facts that need to be validated for AI generated articles.
+    Improved version with better error handling, search query construction, and results display.
     """
     def __init__(self, ui_controller, facts_to_check):
         """
-        Initializes the LuciFactChecker with a reference to the UI controller.
-
-        :param ui_controller: An instance of LuciUIController for UI interactions.
+        Initializes the LuciFactFinder with a reference to the UI controller and the facts to check.
         """
         self.ui = ui_controller
-        self.f2c=facts_to_check
+        self.facts_to_check = facts_to_check
+        self.search = BingSearchAPIWrapper()
 
     def find_facts(self):
-        search = BingSearchAPIWrapper()
-        prefix = ""
-        current_date = datetime.now()
-        two_months_ago = current_date - relativedelta(months=2)
-        formatted_date = two_months_ago.strftime('%Y-%m-%d')
-        fd = " after: " + formatted_date
-        suffix = ""
-        if self.ui.latest_news_option:
+        """
+        Validates the facts by searching for them using a modified search query.
+        """
+        for fact in self.facts_to_check:
+            search_results = self.perform_search_with_retries(fact)
+            self.display_search_results(fact, search_results)
+
+    def perform_search_with_retries(self, fact, retries=2, delay=2):
+        """
+        Attempts to perform the search with retries on failure.
+        """
+        for attempt in range(retries + 1):
+            try:
+                return self.execute_search(fact)
+            except Exception as e:  # Consider catching more specific exceptions
+                if attempt < retries:
+                    time.sleep(delay)
+                else:
+                    raise e
+
+    def execute_search(self, fact):
+        """
+        Executes the search query with modifications based on the UI settings.
+        """
+        prefix, suffix = self.get_search_query_modifiers()
+        return self.search.results(f"{prefix}{fact}{suffix}", 3)
+
+    def get_search_query_modifiers(self):
+        """
+        Constructs the prefix and suffix for the search query based on UI options.
+        """
+        if self.ui.latest_news_option == "Yes":
             prefix = "Get the latest answer for this question: "
-            suffix = fd
+            suffix = " after: " + (datetime.now() - relativedelta(months=2)).strftime('%Y-%m-%d')
         else:
             prefix = ""
             suffix = ""
-        for question in self.f2c:
-            try:
-                sr = search.results(prefix + question + suffix, 3)
-            except:
-                time.sleep(2)
-                try:
-                    sr = search.results(prefix + question + suffix, 3)
-                except:
-                    time.sleep(2)
-                    sr = {"title:": "", "link": ""}
+        return prefix, suffix
 
-            time.sleep(1)
+    def display_search_results(self, fact, search_results):
+        """
+        Displays the search results in the Streamlit UI.
+        """
+        with st.expander(f"Fact: {fact}"):
+            for result in search_results:
+                st.write(f"Title: {result['title']}")
+                st.write(f"Link: {result['link']}")
+                st.write("\n")
 
-
-            with st.expander(question):
-                for r in sr:
-                    st.write(f"Title: {r['title']}")
-                    st.write(f"\tLink: {r['link']}")
-                    st.write("\n")
 
 
 
